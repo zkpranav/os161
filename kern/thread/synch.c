@@ -154,8 +154,6 @@ lock_create(const char *name)
 		return NULL;
 	}
 
-	// HANGMAN_LOCKABLEINIT(&lock->lk_hangman, lock->lk_name);
-
 	lock->lk_wchan = wchan_create(lock->lk_name);
 	if (lock->lk_wchan == NULL) {
 		kfree(lock->lk_name);
@@ -190,13 +188,10 @@ lock_acquire(struct lock *lock)
 	spinlock_acquire(&lock->lk_lock);
 
 	while (lock->lk_holder != NULL) {
-		// HANGMAN_WAIT(&curthread->t_hangman, &lock->lk_hangman);
 		wchan_sleep(lock->lk_wchan, &lock->lk_lock);
 	}
 	KASSERT(lock->lk_holder == NULL);
-
 	lock->lk_holder = curthread;
-	// HANGMAN_ACQUIRE(&curthread->t_hangman, &lock->lk_hangman);
 
 	spinlock_release(&lock->lk_lock);
 }
@@ -211,7 +206,6 @@ lock_release(struct lock *lock)
 
 	lock->lk_holder = NULL;
 	wchan_wakeone(lock->lk_wchan, &lock->lk_lock);
-	// HANGMAN_RELEASE(&curthread->t_hangman, &lock->lk_hangman);
 
 	spinlock_release(&lock->lk_lock);
 }
