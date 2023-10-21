@@ -200,9 +200,9 @@ void
 lock_release(struct lock *lock)
 {
 	KASSERT(lock != NULL);
-	KASSERT(lock->lk_holder == curthread);
 
 	spinlock_acquire(&lock->lk_lock);
+	KASSERT(lock->lk_holder == curthread);
 
 	lock->lk_holder = NULL;
 	wchan_wakeone(lock->lk_wchan, &lock->lk_lock);
@@ -285,7 +285,6 @@ cv_wait(struct cv *cv, struct lock *lock)
 
 	// Ensure no other spinlock is held before potentially blocking
 	lock_acquire(lock);
-
 }
 
 void
