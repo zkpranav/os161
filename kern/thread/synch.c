@@ -378,3 +378,55 @@ void rwlock_destroy(struct rwlock *rw) {
 	kfree(rw);
 }
 
+void rwlock_acquire_read(struct rwlock *rw) {
+	KASSERT(rw != NULL);
+
+	lock_acquire(rw->rwlock_lock);
+	while (rw->rwlock_num_writers_waiting > 0 || rw->rwlock_active_writer) {
+		cv_wait(rw->rwlock_cv, rw->rwlock_lock);
+	}
+
+	KASSERT(rw->rwlock_num_writers_waiting == 0);
+	KASSERT(rw->rwlock_active_writer == false);
+	rw->rwlock_num_readers_active += 1;
+	lock_release(rw->rwlock_lock);
+}
+
+void rwlock_release_read(struct rwlock *rw) {
+	KASSERT(rw != NULL);
+	
+	lock_acquire(rw->rwlock_lock);
+	KASSERT(rw->rwlock_num_readers_active > 0);
+	rw->rwlock_num_readers_active -= 1;
+
+	if (rw->rwlock_num_readers_active == 0) {
+		cv_broadcast(rw->rwlock_cv, rw->rwlock_lock);
+	}
+	lock_release(rw->rwlock_lock);
+}
+
+void rwlock_acquire_write(struct rwlock *rw) {
+	KASSERT(rw != NULL);
+
+	lock_acquire(rw->rwlock_lock);
+	rw->rwlock_num_writers_waiting += 1;
+	while (rw->rwlock_active_writer || rw->rwlock_num_readers_active > 0) {
+		cv_wait(rw->rwlock_cv, rw->rwlock_lock);
+	}
+	
+	KASSERT(rw->rwlock_active_writer == false);
+	KASSERT(rw->rwlock_num_readers_active == 0);
+	rw->rwlock_num_writers_waiting -= 1;
+	rw->rwlock_active_writer = true;
+	lock_release(rw->rwlock_lock);
+}
+
+void rwlock_release_write(struct rwlock *rw) {
+	KASSERT(rw != NULL);
+
+	lock_acquire(rw->rwlock_lock);
+	KASSERT(rw->rwlock_active_writer);
+	rw->rwlock_active_writer = false;
+	cv_broadcast(rw->rwlock_cv, rw->rwlock_lock);
+	lock_release(rw->rwlock_lock);
+}
