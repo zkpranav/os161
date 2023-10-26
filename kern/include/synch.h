@@ -149,10 +149,25 @@ void cv_broadcast(struct cv *cv, struct lock *lock);
  * (should be) made internally.
  */
 
+/*
+ * Defines a write-preferring Reader-Writer lock.
+ * Implemented with a combination of a CV, a Mutex and a couple of state variables.
+ * State variables:
+ * rwlock_num_readers_active - Number of readers that have aquired the lock.
+ * rwlock_num_writers_waiting - Number of writers waiting to aquire the lock.
+ * rwlock_active_writer - Whether a writer has aquired the lock (boolean).
+ */
 struct rwlock {
         char *rwlock_name;
-        // add what you need here
-        // (don't forget to mark things volatile as needed)
+
+        struct wchan *rwlock_wchan;
+        struct spinlock rwlock_slk;
+        struct cv *rwlock_cv;
+        struct lock *rwlock_lock;
+
+        volatile unsigned int rwlock_num_readers_active;
+        volatile unsigned int rwlock_num_writers_waiting;
+        volatile bool rwlock_active_writer;
 };
 
 struct rwlock * rwlock_create(const char *);
