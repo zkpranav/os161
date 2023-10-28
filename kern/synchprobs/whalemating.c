@@ -41,11 +41,37 @@
 #include <synch.h>
 
 /*
+ * Shared primitives
+ */
+struct cv *male_cv;
+struct lock *male_lock;
+struct cv *female_cv;
+struct lock *female_lock;
+
+/*
  * Called by the driver during initialization.
  */
 
 void whalemating_init() {
-	return;
+	male_cv = cv_create("malecv");
+	if (male_cv == NULL) {
+		panic("sp1: cv_create failed\n");
+	}
+
+	male_lock = lock_create("malelock");
+	if (male_lock == NULL) {
+		panic("sp1: lock_create failed\n");
+	}
+
+	female_cv = cv_create("female_cv");
+	if (female_cv == NULL) {
+		panic("sp1: cv_create failed\n");
+	}
+
+	female_lock = lock_create("femalelock");
+	if (female_lock == NULL) {
+		panic("sp1: lock_create failed\n");
+	}
 }
 
 /*
@@ -54,38 +80,47 @@ void whalemating_init() {
 
 void
 whalemating_cleanup() {
-	return;
+	lock_destroy(female_lock);
+	cv_destroy(female_cv);
+	lock_destroy(male_lock);
+	cv_destroy(male_cv);
 }
 
 void
 male(uint32_t index)
 {
-	(void)index;
-	/*
-	 * Implement this function by calling male_start and male_end when
-	 * appropriate.
-	 */
-	return;
+	male_start(index);
+	
+	lock_acquire(male_lock);
+	cv_wait(male_cv, male_lock);
+	lock_release(male_lock);
+
+	male_end(index);
 }
 
 void
 female(uint32_t index)
 {
-	(void)index;
-	/*
-	 * Implement this function by calling female_start and female_end when
-	 * appropriate.
-	 */
-	return;
+	female_start(index);
+
+	lock_acquire(female_lock);
+	cv_wait(female_cv, female_lock);
+	lock_release(female_lock);
+
+	female_end(index);
 }
 
 void
 matchmaker(uint32_t index)
 {
-	(void)index;
-	/*
-	 * Implement this function by calling matchmaker_start and matchmaker_end
-	 * when appropriate.
-	 */
-	return;
+	matchmaker_start(index);
+
+	lock_acquire(male_lock);
+	cv_signal(male_cv, male_lock);
+	lock_release(male_lock);
+	lock_acquire(female_lock);
+	cv_signal(female_cv, female_lock);
+	lock_release(female_lock);
+
+	matchmaker_end(index);
 }
