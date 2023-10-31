@@ -69,50 +69,98 @@
 #include <test.h>
 #include <synch.h>
 
+/* Synchronization primitives & shared globals */
+struct lock *quadrant_mutexes[4];
+struct semaphore *cars_allowed_sem;
+
 /*
  * Called by the driver during initialization.
  */
 
 void
 stoplight_init() {
-	return;
+	char buf[16];
+	for (size_t i = 0; i < 4; ++i) {
+		snprintf(buf, 16, "quadrant_lock_%d", i);
+		quadrant_mutexes[i] = lock_create(buf);
+		if (quadrant_mutexes[i] == NULL) {
+			panic("sp2: lock_create failed\n");
+		}
+	}
+
+	/* Allow atmost 3 cars on the intersection to avoid deadlock. (Refer The Dining Philosopher's problem) */
+	cars_allowed_sem = sem_create("cars_allowed", 3);
 }
 
 /*
  * Called by the driver during teardown.
  */
 
-void stoplight_cleanup() {
-	return;
+void
+stoplight_cleanup() {
+	sem_destroy(cars_allowed_sem);
+
+	for (size_t i = 0; i < 4; ++i) {
+		lock_destroy(quadrant_mutexes[i]);
+	}
+}
+
+uint32_t
+gostraight_quadrant(uint32_t quadrant) {
+	return (quadrant + 3) % 4;
+}
+
+uint32_t
+goleft_quadrant(uint32_t quadrant) {
+	return (quadrant + 2) % 4;
 }
 
 void
 turnright(uint32_t direction, uint32_t index)
 {
-	(void)direction;
-	(void)index;
-	/*
-	 * Implement this function.
-	 */
-	return;
+	P(cars_allowed_sem);
+	lock_acquire(quadrant_mutexes[direction]);
+	inQuadrant(direction, index);
+	leaveIntersection(index);
+	lock_release(quadrant_mutexes[direction]);
+	V(cars_allowed_sem);
 }
+
 void
 gostraight(uint32_t direction, uint32_t index)
 {
-	(void)direction;
-	(void)index;
-	/*
-	 * Implement this function.
-	 */
-	return;
+	P(cars_allowed_sem);
+	lock_acquire(quadrant_mutexes[direction]);
+	inQuadrant(direction, index);
+
+	uint32_t target_quadrant = gostraight_quadrant(direction);
+	lock_acquire(quadrant_mutexes[target_quadrant]);
+	inQuadrant(target_quadrant, index);
+	lock_release(quadrant_mutexes[direction]);
+
+	leaveIntersection(index);
+	lock_release(quadrant_mutexes[target_quadrant]);
+	V(cars_allowed_sem);
 }
+
 void
 turnleft(uint32_t direction, uint32_t index)
 {
-	(void)direction;
-	(void)index;
-	/*
-	 * Implement this function.
-	 */
-	return;
+	P(cars_allowed_sem);
+	lock_acquire(quadrant_mutexes[direction]);
+	inQuadrant(direction, index);
+
+	/* Going straight twice makes a left turn */
+	uint32_t cur_quadrant = direction;
+	for (size_t i = 0; i < 2; ++i) {
+		uint32_t target_quadrant = gostraight_quadrant(cur_quadrant);
+		lock_acquire(quadrant_mutexes[target_quadrant]);
+		inQuadrant(target_quadrant, index);
+		lock_release(quadrant_mutexes[cur_quadrant]);
+		cur_quadrant = target_quadrant;
+	}
+
+	leaveIntersection(index);
+	lock_release(quadrant_mutexes[cur_quadrant]);
+	V(cars_allowed_sem);
 }
