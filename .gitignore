@@ -1,0 +1,13 @@
+/.depend
+/.settings
+/.project
+/.cproject
+/.root
+/kern/compile/
+/defs.mk
+build
+/userland/testbin/randcall/calls.c
+/root/
+*.swo
+*.swp
+
