@@ -139,5 +139,45 @@ void cv_wait(struct cv *cv, struct lock *lock);
 void cv_signal(struct cv *cv, struct lock *lock);
 void cv_broadcast(struct cv *cv, struct lock *lock);
 
+/*
+* Readers-Writer lock.
+* 
+* rwlock_active_reader_count - Number of active readers.
+* rwlock_waiting_writer_count - Number of waiting writers.
+* rwlock_active_writer - Is a writer currently active.
+*
+* Implements a write-preferring lock.
+* Does not allow upgradability.
+* Could be implemented with two wchans & a spinlock (instead of CVs & a mutex).
+*/
+struct rwlock {
+        char *rwlock_name;
+        
+        struct lock *rwlock_mutex;
+        struct cv *rwlock_reader_cv;
+        struct cv *rwlock_writer_cv;
+
+        volatile unsigned rwlock_active_reader_count;
+        volatile unsigned rwlock_waiting_writer_count;
+        volatile bool rwlock_active_writer;
+};
+
+struct rwlock *rwlock_create(char *name);
+void rwlock_destroy(struct rwlock *rwlock);
+
+/*
+* Operations:
+* 
+* rwlock_acquire_read - Acquire for reading. Wait if writers need access.
+* rwlock_acquire_write - Acquire for writing.
+* rwlock_release_read - Release after reading. 
+*                       Wake a writer if no other readers, else wake readers.
+* rwlock_release_write - Release after writing. 
+*                        Wake a writer if no other readers, else wake readers.
+*/
+void rwlock_acquire_read(struct rwlock *rwlock);
+void rwlock_acquire_write(struct rwlock *rwlock);
+void rwlock_release_read(struct rwlock *rwlock);
+void rwlock_release_write(struct rwlock *rwlock);
 
 #endif /* _SYNCH_H_ */
